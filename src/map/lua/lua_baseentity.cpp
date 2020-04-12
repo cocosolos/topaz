@@ -6521,6 +6521,40 @@ inline int32 CLuaBaseEntity::completeMission(lua_State *L)
 }
 
 /************************************************************************
+*  Function: setMissionLogEx()
+*  Purpose : Sets mission log extra data to correctly track progress in branching missions.
+*  Example : player:setMissionLogEx(tpz.mission.log_id.COP, tpz.mission.logEx.ULMIA, 14)
+*  Notes   : 
+************************************************************************/
+
+inline int32 CLuaBaseEntity::setMissionLogEx(lua_State *L)
+{
+    TPZ_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    TPZ_DEBUG_BREAK_IF(m_PBaseEntity->objtype != TYPE_PC);
+
+    TPZ_DEBUG_BREAK_IF(lua_isnil(L, 1) || !lua_isnumber(L, 1));
+    TPZ_DEBUG_BREAK_IF(lua_isnil(L, 2) || !lua_isnumber(L, 2));
+    TPZ_DEBUG_BREAK_IF(lua_isnil(L, 3) || !lua_isnumber(L, 3));
+
+    CCharEntity* PChar = (CCharEntity*)m_PBaseEntity;
+    uint8 missionLogID = (uint8)lua_tointeger(L, 1);
+    uint8 missionLogExPos = (uint8)lua_tointeger(L, 2);
+    uint8 missionLogExValue = (uint8)lua_tointeger(L, 3);
+    uint32 logEx = (PChar->m_missionLog[missionLogID].logExUpper << 16) | PChar->m_missionLog[missionLogID].logExLower;
+    uint32 mask = ~(0xF << (4 * missionLogExPos));
+
+    logEx &= mask;
+    logEx |= missionLogExValue << (4 * missionLogExPos);
+    PChar->m_missionLog[missionLogID].logExLower = logEx;
+    PChar->m_missionLog[missionLogID].logExUpper = logEx >> 16;
+    PChar->pushPacket(new CQuestMissionLogPacket(PChar, missionLogID, LOG_MISSION_CURRENT));
+
+    charutils::SaveMissionsList(PChar);
+
+    return 0;
+}
+
+/************************************************************************
 *  Function: addAssault()
 *  Purpose : Adds an assault mission to the player's log
 *  Example : player:addAssault(bit.rshift(option,4))
@@ -14287,6 +14321,7 @@ Lunar<CLuaBaseEntity>::Register_t CLuaBaseEntity::methods[] =
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,getCurrentMission),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,hasCompletedMission),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,completeMission),
+    LUNAR_DECLARE_METHOD(CLuaBaseEntity,setMissionLogEx),
 
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,addAssault),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,delAssault),
