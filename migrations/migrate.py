@@ -7,6 +7,7 @@ import char_unlock_table_columns
 import HP_masks_to_blobs
 import crystal_storage
 import broken_linkshells
+import mission_blob_extra
 
 credentials = {}
 db = None
@@ -80,6 +81,7 @@ def run_all_migrations():
     run_migration(HP_masks_to_blobs)
     run_migration(crystal_storage)
     run_migration(broken_linkshells)
+    run_migration(mission_blob_extra)
     close()
 
     print("Finished running all migrations")
