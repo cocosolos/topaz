@@ -2,7 +2,7 @@ import array
 import mysql.connector
 
 def migration_name():
-    return "Adding Extra Data to Mision Blob"
+    return "Adding extra data to mission blob"
 
 def check_preconditions(cur):
     return
