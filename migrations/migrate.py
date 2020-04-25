@@ -47,7 +47,8 @@ def connect():
             user=login,
             passwd=password,
             db=database,
-            port=port)
+            port=port,
+            use_pure=True)
 
     cur = db.cursor()
 
