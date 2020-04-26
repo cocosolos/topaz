@@ -6538,8 +6538,23 @@ inline int32 CLuaBaseEntity::setMissionLogEx(lua_State *L)
 
     CCharEntity* PChar = (CCharEntity*)m_PBaseEntity;
     uint8 missionLogID = (uint8)lua_tointeger(L, 1);
+    if (missionLogID >= MAX_MISSIONAREA)
+    {
+        ShowError(CL_RED"Lua::setMissionLogEx: missionLogID %i is invalid\n" CL_RESET, missionLogID);
+        return 0;
+    }
     uint8 missionLogExPos = (uint8)lua_tointeger(L, 2);
+    if (missionLogExPos > 7)
+    {
+        ShowError(CL_RED"Lua::setMissionLogEx: position %i is invalid\n" CL_RESET, missionLogExPos);
+        return 0;
+    }
     uint8 missionLogExValue = (uint8)lua_tointeger(L, 3);
+    if (missionLogExValue > 0xF)
+    {
+        ShowError(CL_RED"Lua::setMissionLogEx: value %i is invalid\n" CL_RESET, missionLogExValue);
+        return 0;
+    }
     uint32 logEx = (PChar->m_missionLog[missionLogID].logExUpper << 16) | PChar->m_missionLog[missionLogID].logExLower;
     uint32 mask = ~(0xF << (4 * missionLogExPos));
 
@@ -6552,6 +6567,48 @@ inline int32 CLuaBaseEntity::setMissionLogEx(lua_State *L)
     charutils::SaveMissionsList(PChar);
 
     return 0;
+}
+
+/************************************************************************
+*  Function: getMissionLogEx()
+*  Purpose : Gets mission log extra data.
+*  Example : player:getMissionLogEx(tpz.mission.log_id.COP, tpz.mission.logEx.ULMIA)
+*  Notes   :  If arg2 isn't provided, the whole 32 bits are returned.
+************************************************************************/
+
+inline int32 CLuaBaseEntity::getMissionLogEx(lua_State *L)
+{
+    TPZ_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    TPZ_DEBUG_BREAK_IF(m_PBaseEntity->objtype != TYPE_PC);
+
+    TPZ_DEBUG_BREAK_IF(lua_isnil(L, 1) || !lua_isnumber(L, 1));
+
+    CCharEntity* PChar = (CCharEntity*)m_PBaseEntity;
+    uint8 missionLogID = (uint8)lua_tointeger(L, 1);
+    if (missionLogID < MAX_MISSIONAREA)
+    {
+        uint32 logEx = (PChar->m_missionLog[missionLogID].logExUpper << 16) | PChar->m_missionLog[missionLogID].logExLower;
+        if (lua_isnumber(L, 2))
+        {
+            uint8 missionLogExPos = (uint8)lua_tointeger(L, 2);
+            if (missionLogExPos > 7)
+            {
+                ShowError(CL_RED"Lua::getMissionLogEx: position %i is invalid\n" CL_RESET, missionLogExPos);
+                return 0;
+            }
+            lua_pushinteger(L, ((logEx >> (4 * missionLogExPos)) & 0xF));
+        }
+        else
+        {
+            lua_pushinteger(L, logEx);
+        }
+    }
+    else
+    {
+        ShowError(CL_RED"Lua::getMissionLogEx: missionLogID %i is invalid\n" CL_RESET, missionLogID);
+        return 0;
+    }
+    return 1;
 }
 
 /************************************************************************
@@ -14322,6 +14379,7 @@ Lunar<CLuaBaseEntity>::Register_t CLuaBaseEntity::methods[] =
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,hasCompletedMission),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,completeMission),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,setMissionLogEx),
+    LUNAR_DECLARE_METHOD(CLuaBaseEntity,getMissionLogEx),
 
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,addAssault),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,delAssault),
