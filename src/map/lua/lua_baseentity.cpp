@@ -6534,7 +6534,6 @@ inline int32 CLuaBaseEntity::setMissionLogEx(lua_State *L)
 
     TPZ_DEBUG_BREAK_IF(lua_isnil(L, 1) || !lua_isnumber(L, 1));
     TPZ_DEBUG_BREAK_IF(lua_isnil(L, 2) || !lua_isnumber(L, 2));
-    TPZ_DEBUG_BREAK_IF(lua_isnil(L, 3) || !lua_isnumber(L, 3));
 
     CCharEntity* PChar = (CCharEntity*)m_PBaseEntity;
     uint8 missionLogID = (uint8)lua_tointeger(L, 1);
@@ -6543,26 +6542,36 @@ inline int32 CLuaBaseEntity::setMissionLogEx(lua_State *L)
         ShowError(CL_RED"Lua::setMissionLogEx: missionLogID %i is invalid\n" CL_RESET, missionLogID);
         return 0;
     }
-    uint8 missionLogExPos = (uint8)lua_tointeger(L, 2);
-    if (missionLogExPos > 7)
+    int32 n = lua_gettop(L);
+    if (n == 3)
     {
-        ShowError(CL_RED"Lua::setMissionLogEx: position %i is invalid\n" CL_RESET, missionLogExPos);
-        return 0;
-    }
-    uint8 missionLogExValue = (uint8)lua_tointeger(L, 3);
-    if (missionLogExValue > 0xF)
-    {
-        ShowError(CL_RED"Lua::setMissionLogEx: value %i is invalid\n" CL_RESET, missionLogExValue);
-        return 0;
-    }
-    uint32 logEx = (PChar->m_missionLog[missionLogID].logExUpper << 16) | PChar->m_missionLog[missionLogID].logExLower;
-    uint32 mask = ~(0xF << (4 * missionLogExPos));
+        uint8 missionLogExPos = (uint8)lua_tointeger(L, 2);
+        if (missionLogExPos > 7)
+        {
+            ShowError(CL_RED"Lua::setMissionLogEx: position %i is invalid\n" CL_RESET, missionLogExPos);
+            return 0;
+        }
+        uint8 missionLogExValue = (uint8)lua_tointeger(L, 3);
+        if (missionLogExValue > 0xF)
+        {
+            ShowError(CL_RED"Lua::setMissionLogEx: value %i is invalid\n" CL_RESET, missionLogExValue);
+            return 0;
+        }
+        uint32 logEx = (PChar->m_missionLog[missionLogID].logExUpper << 16) | PChar->m_missionLog[missionLogID].logExLower;
+        uint32 mask = ~(0xF << (4 * missionLogExPos));
 
-    logEx &= mask;
-    logEx |= missionLogExValue << (4 * missionLogExPos);
-    PChar->m_missionLog[missionLogID].logExLower = logEx;
-    PChar->m_missionLog[missionLogID].logExUpper = logEx >> 16;
-    PChar->pushPacket(new CQuestMissionLogPacket(PChar, missionLogID, LOG_MISSION_CURRENT));
+        logEx &= mask;
+        logEx |= missionLogExValue << (4 * missionLogExPos);
+        PChar->m_missionLog[missionLogID].logExLower = logEx;
+        PChar->m_missionLog[missionLogID].logExUpper = logEx >> 16;
+        PChar->pushPacket(new CQuestMissionLogPacket(PChar, missionLogID, LOG_MISSION_CURRENT));
+    }
+    else if (n == 2)
+    {
+        uint32 missionLogExValue = (uint32)lua_tointeger(L, 2);
+        PChar->m_missionLog[missionLogID].logExLower = missionLogExValue;
+        PChar->m_missionLog[missionLogID].logExUpper = missionLogExValue >> 16;
+    }
 
     charutils::SaveMissionsList(PChar);
 
