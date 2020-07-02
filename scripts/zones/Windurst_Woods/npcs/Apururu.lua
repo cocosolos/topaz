@@ -24,7 +24,7 @@ function onTrade(player,npc,trade)
 end
 
 function onTrigger(player,npc)
-    local missionStatus = player:getCharVar("MissionStatus")
+    local missionStatus = player:getMissionStatus(WINDURST, 0)
     local kindCardian = player:getQuestStatus(JEUNO, tpz.quest.id.jeuno.THE_KIND_CARDIAN)
     local kindCardianCS = player:getCharVar("theKindCardianVar")
     local allNewC3000 = player:getQuestStatus(WINDURST, tpz.quest.id.windurst.THE_ALL_NEW_C_3000)
@@ -99,7 +99,7 @@ function onEventFinish(player,csid,option)
 
     -- WINDURST 1-2: THE HEART OF THE MATTER
     if csid == 137 then
-        player:setCharVar("MissionStatus", 1)
+        player:setMissionStatus(WINDURST, 1)
 
         npcUtil.giveKeyItem(player,
             {
@@ -112,21 +112,12 @@ function onEventFinish(player,csid,option)
             }
         )
 
-        player:setCharVar("MissionStatus_orb1", 1) -- Set the orb variables: 1 = not handled, 2 = handled
-        player:setCharVar("MissionStatus_orb2", 1)
-        player:setCharVar("MissionStatus_orb3", 1)
-        player:setCharVar("MissionStatus_orb4", 1)
-        player:setCharVar("MissionStatus_orb5", 1)
-        player:setCharVar("MissionStatus_orb6", 1)
+        for i = 1, i < 7 do
+            player:setMissionStatus(WINDURST, i, 1) -- Set the orb variables: 1 = not handled, 2 = handled
+        end
+
     elseif csid == 143 or csid == 145 then
         finishMissionTimeline(player, 1, csid, option)
-
-        player:setCharVar("MissionStatus_orb1", 0)
-        player:setCharVar("MissionStatus_orb2", 0)
-        player:setCharVar("MissionStatus_orb3", 0)
-        player:setCharVar("MissionStatus_orb4", 0)
-        player:setCharVar("MissionStatus_orb5", 0)
-        player:setCharVar("MissionStatus_orb6", 0)
 
         player:delKeyItem(tpz.ki.FIRST_GLOWING_MANA_ORB) -- Remove the glowing orb key items
         player:delKeyItem(tpz.ki.SECOND_GLOWING_MANA_ORB)
@@ -137,25 +128,25 @@ function onEventFinish(player,csid,option)
 
     -- WINDURST 8-2: THE JESTER WHO'D BE KING
     elseif csid == 588 then
-        player:setCharVar("MissionStatus", 1)
+        player:setMissionStatus(WINDURST, 1)
         npcUtil.giveKeyItem(player, tpz.ki.MANUSTERY_RING)
     elseif csid == 601 then
-        player:setCharVar("MissionStatus", 3)
+        player:setMissionStatus(WINDURST, 3)
     elseif csid == 590 then
-        player:setCharVar("MissionStatus", 7)
+        player:setMissionStatus(WINDURST, 7)
     elseif csid == 592 then
-        player:setCharVar("MissionStatus", 9)
+        player:setMissionStatus(WINDURST, 9)
     elseif csid == 609 then
         player:setCharVar("ShantottoCS",1)
         finishMissionTimeline(player, 3, csid, option)
 
     -- WINDURST 9-1: DOLL OF THE DEAD
     elseif csid == 619 then
-        player:setCharVar("MissionStatus", 1)
+        player:setMissionStatus(WINDURST, 1)
     elseif csid == 620 then
-        player:setCharVar("MissionStatus", 4)
+        player:setMissionStatus(WINDURST, 4)
     elseif csid == 621 then
-        player:setCharVar("MissionStatus", 7)
+        player:setMissionStatus(WINDURST, 7)
         player:messageSpecial(ID.text.KEYITEM_LOST, tpz.ki.LETTER_FROM_ZONPAZIPPA)
         player:delKeyItem(tpz.ki.LETTER_FROM_ZONPAZIPPA)
 
