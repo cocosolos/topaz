@@ -41,15 +41,15 @@ tpz.mission.area =
     [tpz.mission.log_id.ROV]         = 'rov',
 }
 
-tpz.mission.logEx =
-{
+-- Byte index for MissionStatus
+--[[
     -- Chains of Promathia
     SANDORIA   = 0,
     WINDURST   = 1,
     LOUVERANCE = 2,
     TENZEN     = 3,
     ULMIA      = 4,
-}
+--]]
 
 tpz.mission.id =
 {

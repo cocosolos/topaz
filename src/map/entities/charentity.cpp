@@ -150,8 +150,8 @@ CCharEntity::CCharEntity()
     m_missionLog[6].current = 101; // MISSION_COP
     for (uint8 i = 0; i < MAX_MISSIONAREA; ++i)
     {
-        m_missionLog[i].logExUpper = 0;
-        m_missionLog[i].logExLower = 0;
+        m_missionLog[i].statusUpper = 0;
+        m_missionLog[i].statusLower = 0;
     }
 
 
