@@ -457,6 +457,7 @@ public:
     int32 copyConfrontationEffect(lua_State* L);     // copy confrontation effect, param = targetEntity:getShortID()
 
     // Battlefields
+    int32 inBattlefield(lua_State*);    // returns true if player is inside battlefield
     int32 getBattlefield(lua_State* L);    // returns CBattlefield* or nullptr if not available
     int32 getBattlefieldID(lua_State*);    // returns entity->PBattlefield->GetID() or -1 if not available
     int32 registerBattlefield(lua_State*); // attempt to register a battlefield, returns BATTLEFIELD_RETURNCODE

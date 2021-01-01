@@ -944,7 +944,7 @@ function TradeBCNM(player, npc, trade, onUpdate)
 
     -- validate battlefield status
     if player:hasStatusEffect(tpz.effect.BATTLEFIELD) and not onUpdate then
-        player:messageBasic(94, 0, 0) -- You must wait longer to perform that action.
+        player:PrintToPlayer("You cannot enter the battlefield at present. Please wait a little longer.", 0x1F)
         return false
     end
 
@@ -955,6 +955,8 @@ function TradeBCNM(player, npc, trade, onUpdate)
             player:startEvent(32000, 0, 0, 0, validBattlefields, 0, 0, 0, 0)
         end
         return true
+    else
+        player:PrintToPlayer("You cannot enter the battlefield at present. Please wait a little longer.", 0x1F)
     end
 
     return false
@@ -966,28 +968,43 @@ end
 
 function EventTriggerBCNM(player, npc)
     -- player is in battlefield and clicks to leave
-    if player:getBattlefield() then
+    if player:inBattlefield() then
         player:startEvent(32003)
         return true
 
     -- player wants to register a new battlefield
-    elseif not player:hasStatusEffect(tpz.effect.BATTLEFIELD) then
+    elseif not player:getBattlefield() then
         local mask = findBattlefields(player, npc, 0)
 
         -- mask = 268435455 -- uncomment to open menu with all possible battlefields
         if mask ~= 0 then
             player:startEvent(32000, 0, 0, 0, mask, 0, 0, 0, 0)
             return true
+        else
+            player:PrintToPlayer("You cannot enter the battlefield at present. Please wait a little longer.", 0x1F)
+            return false
         end
 
     -- player is allied with a registrant and wants to enter their instance
     else
-        local stat = player:getStatusEffect(tpz.effect.BATTLEFIELD)
-        local bfid = stat:getPower()
-        local mask = getBattlefieldMaskById(player, bfid)
-        if mask ~= 0 and checkReqs(player, npc, bfid, false) then
-            player:startEvent(32000, 0, 0, 0, mask, 0, 0, 0, 0)
-            return true
+        local battlefield = player:getBattlefield()
+        if battlefield then
+            local bfid = battlefield:getID()
+            local mask = getBattlefieldMaskById(player, bfid)
+            if mask ~= 0 and checkReqs(player, npc, bfid, false) then
+                if battlefield:getStatus() ~= tpz.battlefield.status.OPEN then
+                    player:PrintToPlayer("The battlefield where your party members are engaged in combat is locked. Access is denied.", 0x1F)
+                    return false
+                end
+                if battlefield:getMaxParticipants() == #battlefield:getPlayers() then
+                    player:PrintToPlayer(string.format("Only %i members have clearance to enter the battlefield. This room has reached its maximum capacity.", battlefield:getMaxParticipants()), 0x1F)
+                    return false
+                end
+                player:startEvent(32000, 0, 0, 0, mask, 0, 0, 0, 0)
+                return true
+            end
+        else -- player has battlefield status but is not registered for any battlefields
+            player:delStatusEffect(tpz.effect.BATTLEFIELD)
         end
 
     end
@@ -1009,13 +1026,13 @@ function EventUpdateBCNM(player, csid, option, extras)
             return 0
         elseif option == 255 then
             -- todo: check if battlefields full, check party member requirements
+            --result = player:registerBattlefield(id, area)
             return 0
         end
         local area = player:getLocalVar("[battlefield]area")
         area = area + 1
         local battlefieldIndex = bit.rshift(option, 4)
         local battlefieldId = getBattlefieldIdByBit(player, battlefieldIndex)
-        local effect = player:getStatusEffect(tpz.effect.BATTLEFIELD)
         local id = battlefieldId or player:getBattlefieldID()
         local skip = checkSkip(player, id)
 
@@ -1041,19 +1058,22 @@ function EventUpdateBCNM(player, csid, option, extras)
         }
         local result = tpz.battlefield.returnCode.REQS_NOT_MET
         result = player:registerBattlefield(id, area)
+        local battlefield = player:getBattlefield()
+        if battlefield == nil then
+            player:updateEvent(result, 2)
+            return false
+        end
         local status = tpz.battlefield.status.OPEN
         if result ~= tpz.battlefield.returnCode.CUTSCENE then
             if result == tpz.battlefield.returnCode.INCREMENT_REQUEST then
-                if area < 3 then
+                if area ~= battlefield:getArea() then
                     player:setLocalVar("[battlefield]area", area)
-                else
-                    result = tpz.battlefield.returnCode.WAIT
-                    player:updateEvent(result)
                 end
             end
+           -- player:updateEvent(result)
             return false
         else
-            if not player:getBattlefield() then
+            if not player:inBattlefield() then
                 player:enterBattlefield()
             end
             local initiatorId = 0
@@ -1112,15 +1132,34 @@ end
 -----------------------------------------------
 
 function EventFinishBCNM(player, csid, option)
-    -- player:PrintToPlayer(string.format("EventFinishBCNM csid=%i option=%i", csid, option))
+     player:PrintToPlayer(string.format("EventFinishBCNM csid=%i option=%i", csid, option))
     player:setLocalVar("[battlefield]area", 0)
-    if player:hasStatusEffect(tpz.effect.BATTLEFIELD) then
-        if csid == 32003 and option == 4 then
-            if player:getBattlefield() then
-                player:leaveBattlefield(1)
+    local battlefield = player:getBattlefield()
+    if csid == 32000 and option ~= 0  and option ~= math.pow(2,30) then
+        if battlefield then
+            local zone = player:getZoneID()
+            local bfid = battlefield:getID()
+            local item = getItemById(player, bfid)
+            local initiatorId, initiatorName = battlefield:getInitiator()
+            if item ~= 0 then
+                -- remove limbus chips
+                if zone == 37 or zone == 38 then
+                    player:tradeComplete()
+                -- set other traded item to worn
+                elseif player:hasItem(item) and player:getName() == initiatorName then
+                    --player:createWornItem(item)
+                end
             end
+            return true
+        else
+            --player:startEvent(32002)
+            return false
         end
-        return true
+    elseif csid == 32003 and option == 4 then
+        if battlefield then
+            player:leaveBattlefield(tpz.battlefield.leaveCode.EXIT)
+            return true
+        end
     end
     return false
 end

@@ -169,9 +169,15 @@ size_t CBattlefield::GetMaxParticipants() const
     return m_MaxParticipants;
 }
 
-size_t CBattlefield::GetPlayerCount() const
+uint8 CBattlefield::GetPlayerCount()
 {
-    return m_EnteredPlayers.size();
+    uint8 count;
+    ForEachPlayer([&](CCharEntity* player)
+    {
+        //if (player->StatusEffectContainer->HasStatusEffect(EFFECT_BATTLEFIELD))
+            ++count;
+    });
+    return count;
 }
 
 uint8 CBattlefield::GetLevelCap() const
@@ -277,21 +283,23 @@ bool CBattlefield::InsertEntity(CBaseEntity* PEntity, bool enter, BATTLEFIELDMOB
 {
     TPZ_DEBUG_BREAK_IF(PEntity == nullptr);
 
-    if (PEntity->PBattlefield)
+    if (PEntity->PBattlefield && PEntity->PBattlefield != this)
         return false;
 
     if (PEntity->objtype == TYPE_PC)
     {
-        if (GetPlayerCount() < GetMaxParticipants())
+        if (m_EnteredPlayers.size() < GetMaxParticipants())
         {
             CCharEntity* PChar = static_cast<CCharEntity*>(PEntity);
             if (enter)
             {
                 ApplyLevelRestrictions(PChar);
-                m_EnteredPlayers.emplace(PEntity->id);
-                PChar->ClearTrusts();
-                luautils::OnBattlefieldEnter(PChar, this);
                 charutils::SendTimerPacket(PChar, m_TimeLimit);
+                PChar->ClearTrusts();
+                if (m_EnteredPlayers.emplace(PEntity->id).second)
+                {
+                    luautils::OnBattlefieldEnter(PChar, this);
+                }
             }
             else if (!IsRegistered(PChar))
             {
@@ -417,6 +425,11 @@ bool CBattlefield::IsRegistered(CCharEntity* PChar)
     return PChar && m_RegisteredPlayers.find(PChar->id) != m_RegisteredPlayers.end();
 }
 
+bool CBattlefield::IsEntered(CCharEntity* PChar)
+{
+    return PChar && m_EnteredPlayers.find(PChar->id) != m_EnteredPlayers.end() && PChar->StatusEffectContainer->HasStatusEffect(EFFECT_BATTLEFIELD);
+}
+
 bool CBattlefield::RemoveEntity(CBaseEntity* PEntity, uint8 leavecode)
 {
     // player's already zoned, we dont need to do anything
@@ -430,14 +443,17 @@ bool CBattlefield::RemoveEntity(CBaseEntity* PEntity, uint8 leavecode)
         if (!(m_Rules & BCRULES::RULES_ALLOW_SUBJOBS))
             PChar->StatusEffectContainer->DelStatusEffect(EFFECT_SJ_RESTRICTION);
         if (m_LevelCap)
-            PChar->StatusEffectContainer->DelStatusEffect(EFFECT_LEVEL_RESTRICTION);
-
-        m_EnteredPlayers.erase(m_EnteredPlayers.find(PEntity->id));
-
+            static_cast<CCharEntity*>(PEntity)->StatusEffectContainer->DelStatusEffect(EFFECT_LEVEL_RESTRICTION);
+        auto enteredPlayer = m_EnteredPlayers.find(PEntity->id) != m_EnteredPlayers.end();
         if (leavecode != BATTLEFIELD_LEAVE_CODE_WARPDC)
-            m_RegisteredPlayers.erase(m_RegisteredPlayers.find(PEntity->id));
+        {
+            if (enteredPlayer)
+            {
+                m_EnteredPlayers.erase(PEntity->id);
+            }
+        }
 
-        if (leavecode != 255)
+        if (enteredPlayer && leavecode != 255)
         {
             // todo: probably shouldnt hardcode this
             if (leavecode == BATTLEFIELD_LEAVE_CODE_WARPDC)
@@ -489,9 +505,16 @@ bool CBattlefield::RemoveEntity(CBaseEntity* PEntity, uint8 leavecode)
     // Remove enmity from valid battle entities
     if (auto PBattleEntity = dynamic_cast<CBattleEntity*>(PEntity))
     {
-        PBattleEntity->StatusEffectContainer->DelStatusEffectsByFlag(EFFECTFLAG_CONFRONTATION, true);
-        PBattleEntity->StatusEffectContainer->DelStatusEffect(EFFECT_LEVEL_RESTRICTION);
-        ClearEnmityForEntity(PBattleEntity);
+        auto entity = static_cast<CBattleEntity*>(PEntity);
+        if (leavecode != BATTLEFIELD_LEAVE_CODE_WARPDC)
+        {
+            if (leavecode != BATTLEFIELD_LEAVE_CODE_EXIT || CheckInProgress())
+            {
+                entity->StatusEffectContainer->DelStatusEffectSilent(EFFECT_BATTLEFIELD);
+            }
+        }
+        entity->StatusEffectContainer->DelStatusEffect(EFFECT_LEVEL_RESTRICTION);
+        ClearEnmityForEntity(entity);
     }
 
     PEntity->PBattlefield = nullptr;
@@ -500,8 +523,23 @@ bool CBattlefield::RemoveEntity(CBaseEntity* PEntity, uint8 leavecode)
 
 void CBattlefield::onTick(time_point time)
 {
-    if (!m_Attacked)
-        CheckInProgress();
+    if (!m_Attacked && !CheckInProgress())
+    {
+        for (auto player : m_RegisteredPlayers)
+        {
+            if (auto tempPlayer = GetZone()->GetCharByID(player))
+            {
+                if (m_EnteredPlayers.find(player) == m_EnteredPlayers.end())
+                {
+                    if (!tempPlayer->StatusEffectContainer->GetStatusEffect(EFFECT_BATTLEFIELD))
+                    {
+                        tempPlayer->StatusEffectContainer->AddStatusEffect(new CStatusEffect(EFFECT_BATTLEFIELD, EFFECT_BATTLEFIELD,
+                            this->GetID(), 0, 0, m_Initiator.id, this->GetArea()), true);
+                    }
+                }
+            }
+        }
+    }
 
     if (time > m_Tick + 1s)
     {
@@ -514,7 +552,7 @@ void CBattlefield::onTick(time_point time)
 
         // todo: handle this in global
         // been here too long, gtfo
-        if (GetTimeInside() >= GetTimeLimit())
+        if (GetTimeInside() >= GetTimeLimit() || GetPlayerCount() == 0)
             CanCleanup(true);
     }
 }
@@ -550,7 +588,7 @@ void CBattlefield::Cleanup()
     auto tempEnemies2 = m_AdditionalEnemyList;
     auto tempNpcs = m_NpcList;
     auto tempAllies = m_AllyList;
-    auto tempPlayers = m_EnteredPlayers;
+    auto tempPlayers = m_RegisteredPlayers;
 
     for (auto mob : tempEnemies)
         RemoveEntity(mob.PMob);
@@ -673,7 +711,19 @@ bool CBattlefield::CheckInProgress()
         if (PMob->PEnmityContainer->GetEnmityList()->size())
         {
             if (m_Status == BATTLEFIELD_STATUS_OPEN)
+            {
                 SetStatus(BATTLEFIELD_STATUS_LOCKED);
+                for (auto player : m_RegisteredPlayers)
+                {
+                    if (auto tempPlayer = GetZone()->GetCharByID(player))
+                    {
+                        if (m_EnteredPlayers.find(player) == m_EnteredPlayers.end())
+                        {
+                            static_cast<CCharEntity*>(tempPlayer)->StatusEffectContainer->DelStatusEffectSilent(EFFECT_BATTLEFIELD);
+                        }
+                    }
+                }
+            }
             m_Attacked = true;
         }
     });

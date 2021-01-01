@@ -36,7 +36,7 @@ public:
 
     CBattlefieldHandler(CZone* PZone);
     void	      HandleBattlefields(time_point tick);							         // called every tick to handle win/lose conditions, locking the bcnm, etc
-    uint8         LoadBattlefield(CCharEntity* PChar, uint16 battlefieldID, uint8 area); // attempts to load battlefield, returns BATTLEFIELD_RETURN_CODE
+    uint8         LoadBattlefield(CCharEntity* PChar, uint16 battlefieldID); // attempts to load battlefield, returns BATTLEFIELD_RETURN_CODE
     CBattlefield* GetBattlefield(CBaseEntity* PEntity, bool checkRegistered = false);            // return pointer to battlefield if exists
     CBattlefield* GetBattlefieldByArea(uint8 area) const;
     CBattlefield* GetBattlefieldByInitiator(uint32 charID);

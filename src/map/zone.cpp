@@ -56,6 +56,7 @@
 #include "packets/char_sync.h"
 #include "packets/char_update.h"
 #include "packets/entity_update.h"
+#include "packets/event.h"
 #include "packets/inventory_assign.h"
 #include "packets/inventory_finish.h"
 #include "packets/inventory_item.h"
@@ -929,8 +930,38 @@ void CZone::CharZoneIn(CCharEntity* PChar)
     }
 
     if (m_BattlefieldHandler)
-        if (auto PBattlefield = m_BattlefieldHandler->GetBattlefield(PChar, true))
-            PBattlefield->InsertEntity(PChar, true);
+    {
+        CBattlefield* PBattlefield = m_BattlefieldHandler->GetBattlefield(PChar);
+        if (PBattlefield)
+        {
+            if (PChar->StatusEffectContainer->GetStatusEffect(EFFECT_BATTLEFIELD))
+            { // put player back in battlefield after logout/dc
+                PBattlefield->InsertEntity(PChar, true);
+            }
+            else
+            { // remove player from battlefield after zoning (same zone)
+                PBattlefield->m_EnteredPlayers.erase(PBattlefield->m_EnteredPlayers.find(PChar->id));
+            }
+        }
+        if (!PBattlefield && PChar->StatusEffectContainer->GetStatusEffect(EFFECT_BATTLEFIELD))
+        {
+            if (!m_BattlefieldHandler->GetBattlefield(PChar, true))
+            { // remove player from empty battlefield
+                PChar->StatusEffectContainer->DelStatusEffectSilent(EFFECT_BATTLEFIELD);
+                PChar->pushPacket(new CEventPacket(PChar, 32002, 0));
+            }
+        }
+    }
+    if (zoneutils::GetZone(PChar->loc.prevzone)->m_BattlefieldHandler)
+    {
+        if (auto PBattlefield = zoneutils::GetZone(PChar->loc.prevzone)->m_BattlefieldHandler->GetBattlefield(PChar))
+        {
+            if (!PChar->StatusEffectContainer->GetStatusEffect(EFFECT_BATTLEFIELD))
+            { // remove player from battlefield after zoning (different zone)
+                PBattlefield->m_EnteredPlayers.erase(PBattlefield->m_EnteredPlayers.find(PChar->id));
+            }
+        }
+    }
 
     PChar->PLatentEffectContainer->CheckLatentsZone();
 }

@@ -391,6 +391,24 @@ bool CTargetFind::validEntity(CBattleEntity* PTarget)
         return false;
     }
 
+    if ((m_PBattleEntity->StatusEffectContainer->GetConfrontationEffect() == PTarget->StatusEffectContainer->GetConfrontationEffect() && m_PBattleEntity->StatusEffectContainer->GetConfrontationEffect() != 0) ||
+        (m_PBattleEntity->PBattlefield == PTarget->PBattlefield && m_PBattleEntity->PBattlefield) ||
+        (m_PBattleEntity->PInstance == PTarget->PInstance && m_PBattleEntity->PInstance))
+    {
+        CZone* PZone = zoneutils::GetZone(m_zone);
+        if (PZone->m_BattlefieldHandler)
+        {
+            if (m_PBattleEntity->objtype == TYPE_PC && !PZone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(m_PBattleEntity)))
+            {
+                return false;
+            }
+            if (PTarget->objtype == TYPE_PC && !PZone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(PTarget)))
+            {
+                return false;
+            }
+        }
+    }
+
     if (m_PTarget == PTarget || PTarget->getZone() != m_zone || PTarget->IsNameHidden() || PTarget->status == STATUS_INVISIBLE)
     {
         return false;

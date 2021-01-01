@@ -83,21 +83,45 @@ void CBattlefieldHandler::HandleBattlefields(time_point tick)
     }
 }
 
-uint8 CBattlefieldHandler::LoadBattlefield(CCharEntity* PChar, uint16 battlefieldID, uint8 area)
+uint8 CBattlefieldHandler::LoadBattlefield(CCharEntity* PChar, uint16 battlefieldID)
 {
     if (PChar->PBattlefield == nullptr && m_Battlefields.size() < m_MaxBattlefields)
     {
-        for (auto&& battlefield : m_Battlefields)
+        if (ReachedMaxCapacity(battlefieldID))
+        { // no open areas
+            return BATTLEFIELD_RETURN_CODE_WAIT;
+        }
+        std::vector<uint8> areas;
+        std::string query("SELECT battlefieldNumber FROM bcnm_battlefield WHERE bcnmId = %i;");
+        auto ret = Sql_Query(SqlHandle, query.c_str(), battlefieldID);
+        if (ret != SQL_ERROR && Sql_NumRows(SqlHandle) != 0)
         {
-            if (battlefield.first == area)
+            while (Sql_NextRow(SqlHandle) == SQL_SUCCESS)
             {
-                return BATTLEFIELD_RETURN_CODE_INCREMENT_REQUEST;
+                areas.push_back(Sql_GetUIntData(SqlHandle, 0));
             }
+        }
+        else
+        {
+            ShowDebug("Battlefield areas not found : %u \n", battlefieldID);
+            return BATTLEFIELD_RETURN_CODE_WAIT;
+        }
+        uint8 area = 1;
+        while (!ReachedMaxCapacity(battlefieldID))
+        { // find first open area for battlefield
+            if (std::find(areas.begin(), areas.end(), area) != areas.end() && m_Battlefields.find(area) == m_Battlefields.end())
+            {
+                break;
+            }
+            ++area;
         }
 
         if (battlefieldID == 0xFFFF)
-        {
-            // made it this far so looks like there's a free battlefield
+        { // made it this far so looks like there's a free battlefield
+            if (area > 1)
+            {
+                return BATTLEFIELD_RETURN_CODE_INCREMENT_REQUEST;
+            }
             return BATTLEFIELD_RETURN_CODE_CUTSCENE;
         }
 
@@ -105,13 +129,13 @@ uint8 CBattlefieldHandler::LoadBattlefield(CCharEntity* PChar, uint16 battlefiel
                             FROM bcnm_info i\
                             WHERE bcnmId = %u";
 
-        auto ret = Sql_Query(SqlHandle, fmtQuery, battlefieldID);
+        ret = Sql_Query(SqlHandle, fmtQuery, battlefieldID);
 
         if (ret == SQL_ERROR ||
             Sql_NumRows(SqlHandle) == 0 ||
             Sql_NextRow(SqlHandle) != SQL_SUCCESS)
         {
-            ShowError("Cannot load battlefield : %u \n", battlefieldID);
+            ShowError("Battlefield info not found : %u \n", battlefieldID);
             return BATTLEFIELD_RETURN_CODE_REQS_NOT_MET;
         }
         else
@@ -144,16 +168,22 @@ uint8 CBattlefieldHandler::LoadBattlefield(CCharEntity* PChar, uint16 battlefiel
                 PBattlefield->SetStatus(BATTLEFIELD_STATUS_LOST);
                 PBattlefield->CanCleanup(true);
                 PBattlefield->Cleanup();
-                ShowDebug("battlefield loading failed\n");
+                ShowDebug("Failed to load mobs for battlefield : %u\n", battlefieldID);
                 return BATTLEFIELD_RETURN_CODE_WAIT;
             }
 
             PBattlefield->InsertEntity(PChar, true);
 
             if (lootid != 0)
+            {
                 PBattlefield->SetLocalVar("loot", lootid);
+            }
 
             luautils::OnBattlefieldInitialise(PBattlefield);
+            if (area > 1)
+            {
+                return BATTLEFIELD_RETURN_CODE_INCREMENT_REQUEST;
+            }
             return BATTLEFIELD_RETURN_CODE_CUTSCENE;
         }
     }
@@ -200,17 +230,15 @@ CBattlefield* CBattlefieldHandler::GetBattlefieldByInitiator(uint32 charID)
 
 uint8 CBattlefieldHandler::RegisterBattlefield(CCharEntity* PChar, uint16 battlefieldId, uint8 area, uint32 initiator)
 {
-    if (PChar->PBattlefield)
+    // check if player is registered for a battlefield
+    CBattlefield* PBattlefield = GetBattlefield(PChar, true);
+    if (initiator && PBattlefield && PBattlefield->GetInitiator().id != initiator)
     {
-        ShowDebug("%s tried to enter another battlefield\n", PChar->GetName());
+        ShowDebug("Attempt to register %s to a second battlefield by %s\n", PChar->GetName(), zoneutils::GetChar(initiator)->GetName());
         return BATTLEFIELD_RETURN_CODE_WAIT;
     }
-    // attempt to add to an existing battlefield
-    auto PBattlefield = GetBattlefield(PChar, true);
-
-    // couldnt find this character registered, try find by id and initiator
     if (!PBattlefield)
-    {
+    { // couldnt find this character registered, try find by id and initiator
         for (const auto& battlefield : m_Battlefields)
         {
             if (battlefield.second->GetInitiator().id == initiator && battlefield.second->GetID() == battlefieldId)
@@ -220,25 +248,24 @@ uint8 CBattlefieldHandler::RegisterBattlefield(CCharEntity* PChar, uint16 battle
             }
         }
     }
-    // entity wasnt found in battlefield, assume they have the effect but not physically inside battlefield
     if (PBattlefield)
-    {
+    { // entity is registered for a battlefield
         if (!PBattlefield->CheckInProgress())
-        {
-            // players havent started fighting yet, try entering
+        { // players havent started fighting yet, try entering
+            ShowDebug("area: %u Battle area: %u\n", area, PBattlefield->GetArea());
             if (area != PBattlefield->GetArea())
+            {
                 return BATTLEFIELD_RETURN_CODE_INCREMENT_REQUEST;
-
-            return PBattlefield->InsertEntity(PChar, false) ? BATTLEFIELD_RETURN_CODE_CUTSCENE : BATTLEFIELD_RETURN_CODE_BATTLEFIELD_FULL;
+            }
+            return IsEntered(PChar) || PBattlefield->InsertEntity(PChar, false) ? BATTLEFIELD_RETURN_CODE_CUTSCENE : BATTLEFIELD_RETURN_CODE_BATTLEFIELD_FULL;
         }
         else
         {
-            // todo: probably clear registered chars
             // can't enter, mobs been slapped
             return BATTLEFIELD_RETURN_CODE_LOCKED;
         }
     }
-    return LoadBattlefield(PChar, battlefieldId, area);
+    return LoadBattlefield(PChar, battlefieldId);
 }
 
 bool CBattlefieldHandler::RemoveFromBattlefield(CBaseEntity* PEntity, CBattlefield* PBattlefield, uint8 leavecode)
@@ -252,6 +279,16 @@ bool CBattlefieldHandler::IsRegistered(CCharEntity * PChar)
     for (const auto& battlefield : m_Battlefields)
     {
         if (battlefield.second->IsRegistered(PChar))
+            return true;
+    }
+    return false;
+}
+
+bool CBattlefieldHandler::IsEntered(CCharEntity * PChar)
+{
+    for (const auto& battlefield : m_Battlefields)
+    {
+        if (battlefield.second->IsEntered(PChar))
             return true;
     }
     return false;

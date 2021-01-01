@@ -51,6 +51,8 @@ public:
     int32 getWipeTime(lua_State*);
     int32 getFightTime(lua_State*);
     int32 getPlayers(lua_State*);
+    int32 getPlayerCount(lua_State*);
+    int32 getMaxParticipants(lua_State*);
     int32 getMobs(lua_State*);
     int32 getNPCs(lua_State*);
     int32 getAllies(lua_State*);

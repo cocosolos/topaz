@@ -123,7 +123,7 @@ public:
     duration               GetTimeLimit() const;
     time_point             GetWipeTime() const;
     size_t                 GetMaxParticipants() const;
-    size_t                 GetPlayerCount() const;
+    uint8                  GetPlayerCount();
     uint8                  GetLevelCap() const;
     duration               GetFinishTime() const;
     duration               GetRemainingTime() const;
@@ -161,6 +161,7 @@ public:
     bool                   InsertEntity(CBaseEntity* PEntity, bool inBattlefield = false, BATTLEFIELDMOBCONDITION conditions = CONDITION_NONE, bool ally = false);
     CBaseEntity*           GetEntity(CBaseEntity* PEntity);
     bool                   IsRegistered(CCharEntity* PChar);
+    bool                   IsEntered(CCharEntity* PChar);
     bool                   RemoveEntity(CBaseEntity* PEntity, uint8 leavecode = 0);
     void                   onTick(time_point time);
     bool                   CanCleanup(bool cleanup = false);

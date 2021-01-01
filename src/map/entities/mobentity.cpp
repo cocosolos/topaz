@@ -487,6 +487,28 @@ bool CMobEntity::ValidTarget(CBattleEntity* PInitiator, uint16 targetFlags)
     {
         return false;
     }
+
+    if ((StatusEffectContainer->GetConfrontationEffect() == PInitiator->StatusEffectContainer->GetConfrontationEffect() && StatusEffectContainer->GetConfrontationEffect() != 0) ||
+        (PBattlefield == PInitiator->PBattlefield && PBattlefield) ||
+        (PInstance == PInitiator->PInstance && PInstance))
+    {
+        if (loc.zone->m_BattlefieldHandler)
+        {
+            if (PInitiator->objtype == TYPE_PC && !loc.zone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(PInitiator)))
+            {
+                return false;
+            }
+            if (PInitiator->PMaster && PInitiator->PMaster->objtype == TYPE_PC && !loc.zone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(PInitiator->PMaster)))
+            {
+                return false;
+            }
+            if (PMaster && PMaster->objtype == TYPE_PC && !loc.zone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(PMaster)))
+            {
+                return false;
+            }
+        }
+    }
+
     if (CBattleEntity::ValidTarget(PInitiator, targetFlags))
     {
         return true;

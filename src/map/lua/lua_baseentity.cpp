@@ -9777,6 +9777,22 @@ inline int32 CLuaBaseEntity::copyConfrontationEffect(lua_State* L)
 }
 
 /************************************************************************
+*  Function: inBattlefield()
+*  Purpose : Returns true is player is inside a battlefield
+*  Example : 
+*  Notes   :
+************************************************************************/
+
+inline int32 CLuaBaseEntity::inBattlefield(lua_State *L)
+{
+    TPZ_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    CBattlefield* PBattlefield = m_PBaseEntity->loc.zone->m_BattlefieldHandler->GetBattlefield(m_PBaseEntity);
+
+    lua_pushboolean(L, PBattlefield ? true : false);
+    return 1;
+}
+
+/************************************************************************
 *  Function: getBattlefield()
 *  Purpose : Returns a Battlefield Instance Object to the entity
 *  Example : local battlefield = player:getBattlefield();
@@ -9787,7 +9803,7 @@ inline int32 CLuaBaseEntity::getBattlefield(lua_State* L)
 {
     TPZ_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
 
-    auto PBattlefield = m_PBaseEntity->PBattlefield;
+    CBattlefield* PBattlefield = m_PBaseEntity->loc.zone->m_BattlefieldHandler->GetBattlefield(m_PBaseEntity, true);
 
     if (PBattlefield)
     {
@@ -9816,8 +9832,9 @@ inline int32 CLuaBaseEntity::getBattlefield(lua_State* L)
 inline int32 CLuaBaseEntity::getBattlefieldID(lua_State *L)
 {
     TPZ_DEBUG_BREAK_IF(m_PBaseEntity == nullptr);
+    CBattlefield* PBattlefield = m_PBaseEntity->loc.zone->m_BattlefieldHandler->GetBattlefield(m_PBaseEntity, true);
 
-    lua_pushinteger(L, m_PBaseEntity->PBattlefield ? m_PBaseEntity->PBattlefield->GetID() : -1);
+    lua_pushinteger(L, PBattlefield ? PBattlefield->GetID() : -1);
     return 1;
 }
 
@@ -15457,6 +15474,7 @@ Lunar<CLuaBaseEntity>::Register_t CLuaBaseEntity::methods[] =
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,copyConfrontationEffect),
 
     // Battlefields
+    LUNAR_DECLARE_METHOD(CLuaBaseEntity,inBattlefield),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,getBattlefield),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,getBattlefieldID),
     LUNAR_DECLARE_METHOD(CLuaBaseEntity,registerBattlefield),

@@ -158,6 +158,21 @@ inline int32 CLuaBattlefield::getPlayers(lua_State* L)
     return 1;
 }
 
+inline int32 CLuaBattlefield::getPlayerCount(lua_State* L)
+{
+    TPZ_DEBUG_BREAK_IF(m_PLuaBattlefield == nullptr);
+    lua_pushinteger(L, m_PLuaBattlefield->m_EnteredPlayers.size());
+    return 1;
+}
+
+inline int32 CLuaBattlefield::getMaxParticipants(lua_State* L)
+{
+    TPZ_DEBUG_BREAK_IF(m_PLuaBattlefield == nullptr);
+
+    lua_pushinteger(L, m_PLuaBattlefield->GetMaxParticipants());
+    return 1;
+}
+
 inline int32 CLuaBattlefield::getMobs(lua_State* L)
 {
     TPZ_DEBUG_BREAK_IF(m_PLuaBattlefield == nullptr);
@@ -461,6 +476,8 @@ Lunar<CLuaBattlefield>::Register_t CLuaBattlefield::methods[] =
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getWipeTime),
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getFightTime),
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getPlayers),
+    LUNAR_DECLARE_METHOD(CLuaBattlefield,getPlayerCount),
+    LUNAR_DECLARE_METHOD(CLuaBattlefield,getMaxParticipants),
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getMobs),
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getNPCs),
     LUNAR_DECLARE_METHOD(CLuaBattlefield,getAllies),

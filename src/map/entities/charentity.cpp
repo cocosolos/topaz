@@ -609,6 +609,22 @@ bool CCharEntity::ValidTarget(CBattleEntity* PInitiator, uint16 targetFlags)
     {
         return false;
     }
+    if ((StatusEffectContainer->GetConfrontationEffect() == PInitiator->StatusEffectContainer->GetConfrontationEffect() && StatusEffectContainer->GetConfrontationEffect() != 0) ||
+        (PBattlefield == PInitiator->PBattlefield && PBattlefield) ||
+        (PInstance == PInitiator->PInstance && PInstance))
+    {
+        if (loc.zone->m_BattlefieldHandler)
+        {
+            if (PInitiator->objtype == TYPE_PC && !loc.zone->m_BattlefieldHandler->IsEntered(static_cast<CCharEntity*>(PInitiator)))
+            {
+                return false;
+            }
+            if (objtype == TYPE_PC && !loc.zone->m_BattlefieldHandler->IsEntered(this))
+            {
+                return false;
+            }
+        }
+    }
     if (isDead())
     {
         return (targetFlags & TARGET_PLAYER_DEAD) != 0;
